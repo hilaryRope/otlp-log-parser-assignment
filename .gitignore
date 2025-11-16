@@ -1,0 +1,9 @@
+# Build artifact
+otlp-log-parser
+
+# Local development
+../../Desktop/otlp-log-parser/.idea/
+
+# OS-generated files
+.DS_Store
+/vendor/

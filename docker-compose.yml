@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  otlp-log-parser-assignment:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: otlp-log-parser-assignment
+    ports:
+      - "4317:4317"  # gRPC OTLP endpoint
+      - "9090:9090"  # Prometheus metrics endpoint
+    environment:
+      - PORT=4317
+      - METRICS_PORT=9090
+      - ATTRIBUTE_KEY=service.name
+      - WINDOW_DURATION=10s
+      - DEBUG=false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost 4317 && nc -z localhost 9090"] ## Check both gRPC and metrics endpoints
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - otlp-network
+
+  #Run with custom configuration
+  otlp-log-parser-assignment-custom:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: otlp-log-parser-assignment-custom
+    ports:
+      - "4318:4317"  # gRPC OTLP endpoint
+      - "9091:9090"  # Prometheus metrics endpoint (different host port to avoid conflict)
+    environment:
+      - PORT=4317
+      - METRICS_PORT=9090
+      - ATTRIBUTE_KEY=foo
+      - WINDOW_DURATION=5s
+      - DEBUG=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost 4317 && nc -z localhost 9090"] ## Check both gRPC and metrics endpoints
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    profiles:
+      - custom
+    networks:
+      - otlp-network
+
+networks:
+  otlp-network:
+    driver: bridge
