@@ -21,7 +21,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
-	defer appLogger.Sync()
+	defer func() {
+		if err := appLogger.Sync(); err != nil {
+			log.Printf("Failed to sync logger: %v", err)
+		}
+	}()
 
 	startMetricsServer(cfg, appLogger)
 

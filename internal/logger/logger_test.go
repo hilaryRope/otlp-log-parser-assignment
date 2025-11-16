@@ -184,7 +184,7 @@ func TestProductionJSONOutput(t *testing.T) {
 	logger.Infow("test message", "key", "value", "number", 42)
 
 	// Sync to ensure output is written
-	logger.Sync()
+	_ = logger.Sync() // Ignore error in test
 
 	// Verify JSON output
 	output := buf.String()
