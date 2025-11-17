@@ -16,7 +16,6 @@ type Extractor struct {
 	attributeKey string
 }
 
-// NewExtractor creates a new attribute extractor
 func NewExtractor(attributeKey string) *Extractor {
 	return &Extractor{
 		attributeKey: attributeKey,

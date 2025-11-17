@@ -39,32 +39,27 @@ grpcurl -plaintext localhost:4317 list
 # opentelemetry.proto.collector.logs.v1.LogsService
 ```
 
-### 4. Send Your First Request
+### 4. Send the First Request
 
-#### **Start with HTTP (Works Immediately)**
+#### **Start with HTTP**
 ```bash
 # Test Prometheus metrics endpoint
 curl http://localhost:9090/metrics
 
 # Check specific application metrics
-curl -s http://localhost:9090/metrics | grep otlp_log_parser
+curl -s http://localhost:9090/metrics | grep otlp_log_parser_assignment
 ```
 
 #### **Test gRPC Endpoints**
 ```bash
 # Test health check
 grpcurl -plaintext localhost:4317 grpc.health.v1.Health/Check
-
-# Expected response: {"status": "SERVING"}
 ```
 
-**Expected gRPC Response:**
+**Expected Health Check Response:**
 ```json
 {
-  "partialSuccess": {
-    "rejectedLogRecords": "0",
-    "errorMessage": ""
-  }
+  "status": "SERVING"
 }
 ```
 
@@ -99,6 +94,13 @@ grpcurl -plaintext -d '{
     }]
   }]
 }' localhost:4317 opentelemetry.proto.collector.logs.v1.LogsService/Export
+```
+
+**Expected OTLP Export Response:**
+```json
+{
+  "partialSuccess": {}
+}
 ```
 
 #### 3. **Export Logs - Complex Types**

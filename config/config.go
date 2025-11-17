@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// Config holds the application configuration
 type Config struct {
 	GRPCPort    int
 	MetricsPort int

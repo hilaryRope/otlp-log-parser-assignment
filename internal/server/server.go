@@ -31,7 +31,6 @@ type Server struct {
 	logger        *logger.Logger
 }
 
-// NewServer creates a new server instance
 func NewServer(cfg *config.Config, logger *logger.Logger) (*Server, error) {
 	// Create attribute extractor
 	extractor := attributes.NewExtractor(cfg.AttributeKey)
