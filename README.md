@@ -39,50 +39,6 @@ make build
 ./otlp-log-parser-assignment -attribute-key=foo -window-duration=10s
 ```
 
-### Run Tests
-```bash
-make test
-```
-
-### Troubleshooting
-
-#### Port Already Allocated
-
-**Error:**
-```
-Error response from daemon: Bind for 0.0.0.0:4317 failed: port is already allocated
-Error response from daemon: Bind for 0.0.0.0:9090 failed: port is already allocated
-```
-
-**Cause:** Another process or container is already using port 4317 (gRPC) or 9090 (metrics).
-
-**Solution:**
-
-1. **Check what's using the ports:**
-   ```bash
-   lsof -i :4317  # gRPC port
-   lsof -i :9090  # Metrics port
-   # or
-   docker compose ps
-   ```
-
-2. **Stop existing containers:**
-   ```bash
-   docker compose down
-   # or stop specific container
-   docker stop otlp-log-parser-assignment
-   docker rm otlp-log-parser-assignment
-   ```
-
-3. **Kill process using the ports (if not Docker):**
-   ```bash
-   # Find the process IDs
-   lsof -ti :4317
-   lsof -ti :9090
-   # Kill them
-   kill <PID>
-   ```
-
 ## How It Works
 
 **OTLP Request** → **Extract Attributes** (Resource→Scope→Log priority) → **Count by Value** → **Report Every Window**
@@ -353,9 +309,8 @@ grpcurl -plaintext localhost:4317 grpc.health.v1.Health/Check
 Enhanced structured JSON logs with detailed statistics:
 
 ```json
-{"level":"info","ts":1763322259.042054,"caller":"service/logs_service.go:41","msg":"Processing request","component":"service","log_records":1,"attribute_values":1}
-
-{"level":"info","ts":1763322260.167354,"caller":"counter/window_counter.go:126","msg":"Log attribute counts report","component":"counter","window_number":1,"time_range":"19:44:10 - 19:44:20","duration":"10.01s","total_logs":1005,"unique_values":3,"attribute_counts":{"bar":{"count":335,"percentage":33.3},"baz":{"count":335,"percentage":33.3},"qux":{"count":335,"percentage":33.3}}}
+2025-11-17T19:45:57.812+0100    INFO    service/logs_service.go:41      Processing request      {"component": "service", "log_records": 5, "attribute_values": 5}
+2025-11-17T19:45:58.427+0100    INFO    counter/window_counter.go:126   Log attribute counts report     {"component": "counter", "window_number": 2, "time_range": "19:44:08 - 19:45:58", "duration": "1m50s", "total_logs": 5, "unique_values": 4, "attribute_counts": {"bar":{"count":1,"percentage":20},"baz":{"count":2,"percentage":40},"qux":{"count":1,"percentage":20},"unknown":{"count":1,"percentage":20}}}
 ```
 
 ### Debug Mode (`-debug=true`)

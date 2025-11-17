@@ -1,93 +1,44 @@
-# API Testing
+# API Testing Guide
 
-This folder contains testing instructions and collections for the OTLP Log Parser gRPC endpoints and Prometheus metrics using **grpcurl** (recommended) and **curl** for HTTP endpoints.
-
-> 💡 **See the [main README](../README.md) for server installation, configuration options, and architecture details.**
+Simple examples to test the OTLP Log Parser service.
 
 ## Quick Start
 
 ### 1. Start the Server
-
 ```bash
-docker compose up -d
-docker compose logs -f  # Watch server output
+go run ./cmd -attribute-key=foo -window-duration=10s -debug
 ```
 
-> 💡 **Recommended:** Docker Compose ensures a clean, isolated environment. Alternatively, you can [build and run the binary](../README.md#quick-start).
-
-### 2. Install grpcurl (if not already installed)
-
+### 2. Install grpcurl
 ```bash
-# macOS
 brew install grpcurl
-
-# Or download from: https://github.com/fullstorydev/grpcurl/releases
 ```
 
-### 3. Verify Server Reflection
+## Basic Tests
 
-The server has gRPC reflection enabled by default. You can verify available services:
-
+### Health Check
 ```bash
-# List all available services
-grpcurl -plaintext localhost:4317 list
-
-# Expected output:
-# grpc.health.v1.Health
-# grpc.reflection.v1.ServerReflection
-# grpc.reflection.v1alpha.ServerReflection
-# opentelemetry.proto.collector.logs.v1.LogsService
+grpcurl -plaintext localhost:4317 grpc.health.v1.Health/Check
 ```
+**Expected:** `{"status": "SERVING"}`
 
-### 4. Send the First Request
-
-#### **Start with HTTP**
+### Metrics Check
 ```bash
-# Test Prometheus metrics endpoint
 curl http://localhost:9090/metrics
-
-# Check specific application metrics
-curl -s http://localhost:9090/metrics | grep otlp_log_parser_assignment
 ```
+**Expected:** Prometheus metrics output
 
-#### **Test gRPC Endpoints**
-```bash
-# Test health check
-grpcurl -plaintext localhost:4317 grpc.health.v1.Health/Check
-```
+## Log Testing Examples
 
-**Expected Health Check Response:**
-```json
-{
-  "status": "SERVING"
-}
-```
-
-**Expected Server Logs (JSON format):**
-```json
-{"level":"info","time":"2024-11-16T19:15:30.123Z","component":"service","message":"Processing request","log_records":1,"attribute_values":1}
-```
-
-## Available Test Commands
-
-Here are the 6 main test scenarios you can run:
-
-### gRPC Endpoints (Port 4317)
-
-#### 1. **Health Check**
-```bash
-grpcurl -plaintext localhost:4317 grpc.health.v1.Health/Check
-```
-
-#### 2. **Export Logs - Simple**
+### Example 1: Simple Single Log
 ```bash
 grpcurl -plaintext -d '{
   "resourceLogs": [{
     "scopeLogs": [{
       "logRecords": [{
-        "body": {"stringValue": "Simple test log message"},
+        "body": {"stringValue": "test log"},
         "attributes": [{
-          "key": "service.name",
+          "key": "foo",
           "value": {"stringValue": "bar"}
         }]
       }]
@@ -95,200 +46,127 @@ grpcurl -plaintext -d '{
   }]
 }' localhost:4317 opentelemetry.proto.collector.logs.v1.LogsService/Export
 ```
+**Expected:** `{"partialSuccess": {}}`  
+**Server Output:**
 
-**Expected OTLP Export Response:**
-```json
-{
-  "partialSuccess": {}
-}
+```bash2025-11-17T19:44:08.426+0100    INFO    counter/window_counter.go:126   Log attribute counts report     {"component": "counter", "window_number": 1, "time_range": "19:42:58 - 19:44:08", "duration": "1m10.001s", "total_logs": 1, "unique_values": 1, "attribute_counts": {"bar":{"count":1,"percentage":100}}}
+
+╔═══════════════════════════════════════════════════════════╗
+║          Log Attribute Counts Report                      ║
+╠═══════════════════════════════════════════════════════════╣
+║ Window #1                                                 ║
+║ Time Range: 19:42:58 - 19:44:08                           ║
+║ Duration: 1m10.001s                                       ║
+║ Total Logs: 1                                             ║
+║ Unique Values: 1                                          ║
+╠═══════════════════════════════════════════════════════════╣
+║ Attribute Value Counts:                                   ║
+╠═══════════════════════════════════════════════════════════╣
+║ bar                                             1 (100.0%) ║
+╚═══════════════════════════════════════════════════════════╝```
 ```
 
-#### 3. **Export Logs - Complex Types**
+### Example 2: Sample Attributes
+Test the exact pseudo code example from the assignment requirements:
 ```bash
 grpcurl -plaintext -d '{
   "resourceLogs": [{
     "scopeLogs": [{
+      "logRecords": [
+        {"body": {"stringValue": "my log body 1"}, "attributes": [{"key": "foo", "value": {"stringValue": "bar"}}, {"key": "baz", "value": {"stringValue": "qux"}}]},
+        {"body": {"stringValue": "my log body 2"}, "attributes": [{"key": "foo", "value": {"stringValue": "qux"}}, {"key": "baz", "value": {"stringValue": "qux"}}]},
+        {"body": {"stringValue": "my log body 3"}, "attributes": [{"key": "baz", "value": {"stringValue": "qux"}}]},
+        {"body": {"stringValue": "my log body 4"}, "attributes": [{"key": "foo", "value": {"stringValue": "baz"}}]},
+        {"body": {"stringValue": "my log body 5"}, "attributes": [{"key": "foo", "value": {"stringValue": "baz"}}, {"key": "baz", "value": {"stringValue": "qux"}}]}
+      ]
+    }]
+  }]
+}' localhost:4317 opentelemetry.proto.collector.logs.v1.LogsService/Export
+```
+**Expected:** `{"partialSuccess": {}}`  
+**Server Output:**
+
+```bash
+
+2025-11-17T19:45:58.427+0100    INFO    counter/window_counter.go:126   Log attribute counts report     {"component": "counter", "window_number": 2, "time_range": "19:44:08 - 19:45:58", "duration": "1m50s", "total_logs": 5, "unique_values": 4, "attribute_counts": {"bar":{"count":1,"percentage":20},"baz":{"count":2,"percentage":40},"qux":{"count":1,"percentage":20},"unknown":{"count":1,"percentage":20}}}
+╔═══════════════════════════════════════════════════════════╗
+║          Log Attribute Counts Report                      ║
+╠═══════════════════════════════════════════════════════════╣
+║ Window #2                                                 ║
+║ Time Range: 19:44:08 - 19:45:58                           ║
+║ Duration: 1m50s                                           ║
+║ Total Logs: 5                                             ║
+║ Unique Values: 4                                          ║
+╠═══════════════════════════════════════════════════════════╣
+║ Attribute Value Counts:                                   ║
+╠═══════════════════════════════════════════════════════════╣
+║ bar                                             1 ( 20.0%) ║
+║ baz                                             2 ( 40.0%) ║
+║ qux                                             1 ( 20.0%) ║
+║ unknown                                         1 ( 20.0%) ║
+╚═══════════════════════════════════════════════════════════╝
+
+```
+
+### Example 3: Multi-Level Attributes
+Test attribute priority (Log > Scope > Resource):
+```bash
+grpcurl -plaintext -d '{
+  "resourceLogs": [{
+    "resource": {"attributes": [{"key": "foo", "value": {"stringValue": "resource-level"}}]},
+    "scopeLogs": [{
+      "scope": {"attributes": [{"key": "foo", "value": {"stringValue": "scope-level"}}]},
       "logRecords": [{
-        "body": {"stringValue": "Complex types test"},
-        "attributes": [{
-          "key": "tags",
-          "value": {
-            "arrayValue": {
-              "values": [
-                {"stringValue": "production"},
-                {"stringValue": "critical"}
-              ]
-            }
-          }
-        }]
+        "body": {"stringValue": "priority test"},
+        "attributes": [{"key": "foo", "value": {"stringValue": "log-level"}}]
       }]
     }]
   }]
 }' localhost:4317 opentelemetry.proto.collector.logs.v1.LogsService/Export
 ```
+**Expected:** `{"partialSuccess": {}}`  
+**Server Output:**
 
-#### 4. **Export Logs - Batch**
 ```bash
-grpcurl -plaintext -d '{
-  "resourceLogs": [{
-    "scopeLogs": [{
-      "logRecords": [
-        {
-          "body": {"stringValue": "Batch log 1"},
-          "attributes": [{
-            "key": "service.name",
-            "value": {"stringValue": "batch-service-1"}
-          }]
-        },
-        {
-          "body": {"stringValue": "Batch log 2"},
-          "attributes": [{
-            "key": "service.name",
-            "value": {"stringValue": "batch-service-2"}
-          }]
-        }
-      ]
-    }]
-  }]
-}' localhost:4317 opentelemetry.proto.collector.logs.v1.LogsService/Export
+
+2025-11-17T19:47:28.441+0100    INFO    counter/window_counter.go:126   Log attribute counts report     {"component": "counter", "window_number": 3, "time_range": "19:45:58 - 19:47:28", "duration": "1m30s", "total_logs": 1, "unique_values": 1, "attribute_counts": {"log-level":{"count":1,"percentage":100}}}
+
+╔═══════════════════════════════════════════════════════════╗
+║          Log Attribute Counts Report                      ║
+╠═══════════════════════════════════════════════════════════╣
+║ Window #3                                                 ║
+║ Time Range: 19:45:58 - 19:47:28                           ║
+║ Duration: 1m30s                                           ║
+║ Total Logs: 1                                             ║
+║ Unique Values: 1                                          ║
+╠═══════════════════════════════════════════════════════════╣
+║ Attribute Value Counts:                                   ║
+╠═══════════════════════════════════════════════════════════╣
+║ log-level                                       1 (100.0%) ║
+╚═══════════════════════════════════════════════════════════╝
+
 ```
 
-#### 5. **Export Logs - Attribute Priority Test**
-```bash
-grpcurl -plaintext -d '{
-  "resourceLogs": [{
-    "resource": {
-      "attributes": [{
-        "key": "env",
-        "value": {"stringValue": "resource-level"}
-      }]
-    },
-    "scopeLogs": [{
-      "scope": {
-        "attributes": [{
-          "key": "env",
-          "value": {"stringValue": "scope-level"}
-        }]
-      },
-      "logRecords": [
-        {
-          "body": {"stringValue": "Priority test - log level wins"},
-          "attributes": [{
-            "key": "env",
-            "value": {"stringValue": "log-level"}
-          }]
-        },
-        {
-          "body": {"stringValue": "Priority test - scope level wins"}
-        }
-      ]
-    }]
-  }]
-}' localhost:4317 opentelemetry.proto.collector.logs.v1.LogsService/Export
-```
-
-### HTTP Endpoints (Port 9090)
-
-#### 6. **Prometheus Metrics**
-```bash
-# Get all metrics
-curl http://localhost:9090/metrics
-
-# Get only application metrics
-curl -s http://localhost:9090/metrics | grep otlp_log_parser_assignment
-```
-
-## Test Scenarios
-
-### Basic Test
-```bash
-# Start with Docker Compose (uses default config)
-docker compose up -d
-docker compose logs -f
-
-# In Insomnia: Send "Export Logs - Simple"
-# Expected: Structured JSON logs showing request processing
-# Expected: Window report after 10s with "bar - 1"
-```
-
-### Metrics Test
-```bash
-# Start the server
-docker compose up -d
-
-# In Insomnia: Send "Prometheus Metrics"
-# Expected: Prometheus metrics in text format
-# Example output:
-# otlp_log_parser_assignment_requests_total 0
-# otlp_log_parser_assignment_log_records_processed_total 0
-```
-
-### Complex Types
-```bash
-# Start with custom attribute key
-ATTRIBUTE_KEY=tags docker compose up -d
-docker compose logs -f
-
-# In Insomnia: Send "Export Logs - Complex Types"
-# Expected: Server shows ["production","critical"] in structured logs
-```
-
-### Attribute Priority
-```bash
-# Start with custom attribute key
-ATTRIBUTE_KEY=env docker compose up -d
-docker compose logs -f
-
-# In Insomnia: Send "Export Logs - Attribute Priority Test"
-# Expected: Structured logs showing both "log-level" and "scope-level" values
-```
-
-> **Tip:** Stop the server with `docker compose down` before changing configuration.
 
 ## Troubleshooting
 
-**gRPC Connection refused?**
-- Check server is running: `docker compose ps` or `lsof -i :4317`
-- Start server: `docker compose up -d`
-
-**Metrics endpoint not accessible?**
-- Check metrics port: `lsof -i :9090`
-- Verify metrics server started: Look for "Starting Prometheus metrics server" in logs
-- Try: `curl http://localhost:9090/metrics`
-
-**No proto definitions?**
-- Ensure "Use Server Reflection" is enabled in Insomnia
-- Server has reflection enabled by default
-
-**No structured logs appearing?**
-- Check logs: `docker compose logs -f`
-- Logs are in JSON format by default (production mode)
-- For human-readable logs, add `-debug=true` flag
-
-**No window reports?**
-- Wait for window duration to elapse (default 10s)
-- Ensure requests are being sent successfully
-- Check for structured log entries with "window_number" field
-
-## Monitoring Results
-
-While testing, monitor the application:
-
+### Port Already in Use
 ```bash
-# Watch server logs (structured JSON)
-docker compose logs -f otlp-log-parser-assignment
-
-# Monitor metrics in real-time
-watch -n 1 'curl -s http://localhost:9090/metrics | grep otlp_log_parser_assignment'
+lsof -ti :4317 | xargs kill -9 2>/dev/null || true
+lsof -ti :9090 | xargs kill -9 2>/dev/null || true
 ```
 
-## Collection Files
+### Server Not Responding
+1. Check if server is running: `ps aux | grep otlp`
+2. Check server logs for errors
+3. Verify ports with: `lsof -i :4317`
 
-- **`insomnia-collection.yaml`** - Insomnia collection (optional GUI alternative)
+## What to Expect
 
-## Resources
+### Immediate Response
+All gRPC calls return: `{"partialSuccess": {}}`
 
-- [Main README](../README.md) - Full documentation
-- [grpcurl Documentation](https://github.com/fullstorydev/grpcurl)
-- [Insomnia gRPC Guide](https://docs.insomnia.rest/insomnia/requests#grpc) (optional)
-- [OTLP Specification](https://opentelemetry.io/docs/specs/otlp/)
+### Server Logs (after window duration)
+- **JSON format**: Structured log with counts and percentages
+- **Debug mode**: JSON + ASCII table
+- **Example**: `{"attribute_counts":{"bar":{"count":1,"percentage":100}}}`
