@@ -35,7 +35,7 @@ func (s *LogsService) Export(ctx context.Context, req *collectorpb.ExportLogsSer
 	// Count log records for metrics
 	logRecordCount := s.countLogRecords(req.ResourceLogs)
 
-	// Process logs in batch for high throughput
+	// Process logs in batch for high throughput using hierarchy extraction
 	attributeValues := s.extractAttributeValues(req.ResourceLogs)
 
 	s.logger.Infow("Processing request", "log_records", logRecordCount, "attribute_values", len(attributeValues))
@@ -68,21 +68,9 @@ func (s *LogsService) extractAttributeValues(resourceLogs []*logspb.ResourceLogs
 			continue
 		}
 
-		// Extract resource-level attribute (applies to all logs in this resource)
-		resourceValue := attributes.UnknownValue
-		if resourceLog.Resource != nil {
-			resourceValue = s.extractor.ExtractValue(resourceLog.Resource.Attributes)
-		}
-
 		for _, scopeLog := range resourceLog.ScopeLogs {
 			if scopeLog == nil {
 				continue
-			}
-
-			// Extract scope-level attribute (applies to all logs in this scope)
-			scopeValue := attributes.UnknownValue
-			if scopeLog.Scope != nil {
-				scopeValue = s.extractor.ExtractValue(scopeLog.Scope.Attributes)
 			}
 
 			for _, logRecord := range scopeLog.LogRecords {
@@ -90,19 +78,9 @@ func (s *LogsService) extractAttributeValues(resourceLogs []*logspb.ResourceLogs
 					continue
 				}
 
-				// Priority: Log-level > Scope-level > Resource-level
-				logValue := s.extractor.ExtractValue(logRecord.Attributes)
-
-				var finalValue string
-				if logValue != attributes.UnknownValue {
-					finalValue = logValue
-				} else if scopeValue != attributes.UnknownValue {
-					finalValue = scopeValue
-				} else {
-					finalValue = resourceValue
-				}
-
-				values = append(values, finalValue)
+				// Use hierarchy extraction method like the starter code
+				value := s.extractor.ExtractFromHierarchy(resourceLog.Resource, scopeLog.Scope, logRecord)
+				values = append(values, value)
 			}
 		}
 	}

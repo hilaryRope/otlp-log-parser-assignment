@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 )
 
 const (
@@ -20,6 +22,34 @@ func NewExtractor(attributeKey string) *Extractor {
 	return &Extractor{
 		attributeKey: attributeKey,
 	}
+}
+
+// ExtractFromHierarchy extracts attribute value with proper hierarchy precedence
+// Priority: Log-level > Scope-level > Resource-level > unknown
+func (e *Extractor) ExtractFromHierarchy(resource *resourcepb.Resource, scope *commonpb.InstrumentationScope, logRecord *logspb.LogRecord) string {
+	// First try log-level attributes (highest priority)
+	if logRecord != nil {
+		if value := e.ExtractValue(logRecord.Attributes); value != UnknownValue {
+			return value
+		}
+	}
+
+	// Then try scope-level attributes
+	if scope != nil {
+		if value := e.ExtractValue(scope.Attributes); value != UnknownValue {
+			return value
+		}
+	}
+
+	// Finally try resource-level attributes
+	if resource != nil {
+		if value := e.ExtractValue(resource.Attributes); value != UnknownValue {
+			return value
+		}
+	}
+
+	// Return unknown if not found at any level
+	return UnknownValue
 }
 
 // ExtractValue extracts the attribute value from a list of KeyValue pairs
