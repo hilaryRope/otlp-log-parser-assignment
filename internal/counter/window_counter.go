@@ -85,15 +85,20 @@ func (wc *WindowCounter) IncrementBatch(attributeValues []string) {
 // reportAndReset reports the current counts and resets the counter
 func (wc *WindowCounter) reportAndReset() {
 	wc.mu.Lock()
-	defer wc.mu.Unlock()
 
 	if len(wc.currentCounts) == 0 {
 		wc.logger.Infow("No data to report in this window")
 		return
 	}
 
-	keys := make([]string, 0, len(wc.currentCounts))
-	for key := range wc.currentCounts {
+	counts := wc.currentCounts
+	wc.currentCounts = make(map[string]int64)
+	wc.windowStart = time.Now()
+
+	wc.mu.Unlock()
+
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
@@ -102,26 +107,17 @@ func (wc *WindowCounter) reportAndReset() {
 	windowEnd := now
 	windowDuration := windowEnd.Sub(wc.windowStart)
 	totalLogs := int64(0)
-	for _, count := range wc.currentCounts {
+	for _, count := range counts {
 		totalLogs += count
 	}
 	wc.totalWindows++
 
 	// Create detailed counts with percentages
 	type AttributeCount struct {
-		Count      int64   `json:"count"`
-		Percentage float64 `json:"percentage"`
+		Count int64 `json:"count"`
 	}
 
 	detailedCounts := make(map[string]AttributeCount)
-	for _, key := range keys {
-		count := wc.currentCounts[key]
-		percentage := float64(count) / float64(totalLogs) * 100
-		detailedCounts[key] = AttributeCount{
-			Count:      count,
-			Percentage: percentage,
-		}
-	}
 
 	wc.logger.Infow("Log attribute counts report",
 		"window_number", wc.totalWindows,
@@ -137,9 +133,6 @@ func (wc *WindowCounter) reportAndReset() {
 		wc.printASCIITable(windowEnd, windowDuration, totalLogs, keys)
 	}
 
-	// Reset counts for next window
-	wc.currentCounts = make(map[string]int64)
-	wc.windowStart = now
 }
 
 // printASCIITable prints a beautiful ASCII table for debug mode
