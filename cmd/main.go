@@ -19,7 +19,7 @@ func main() {
 
 	appLogger, err := logger.New(cfg.Debug)
 	if err != nil {
-		log.Fatalf("Failed to initialize logger: %v", err)
+		log.Fatalf("Failed to initialise logger: %v", err)
 	}
 	defer func() {
 		if err := appLogger.Sync(); err != nil {
